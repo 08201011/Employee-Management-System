@@ -154,3 +154,78 @@ std::vector<Worker*> WorkerManager::GetAllWorkers() const {
     return std::vector<Worker*>(m_EmpArray, m_EmpArray + m_EmpNum);
 }
 
+void WorkerManager::saveToFile() {
+    std::ofstream ofs(FILENAME, std::ios::binary);
+    if (!ofs) return;
+
+    for (int i = 0; i < m_EmpNum; i++) {
+        Worker* worker = m_EmpArray[i];
+        size_t nameLength = worker->m_Name.size();
+
+        ofs.write(reinterpret_cast<const char*>(&worker->m_Id), sizeof(int));
+        ofs.write(reinterpret_cast<const char*>(&nameLength), sizeof(size_t));
+        ofs.write(worker->m_Name.c_str(), nameLength);
+        ofs.write(reinterpret_cast<const char*>(&worker->m_DeptId), sizeof(int));
+    }
+
+    m_FileIsEmpty = (m_EmpNum == 0);
+    ofs.close();
+}
+
+void WorkerManager::loadFromFile() {
+    std::ifstream ifs(FILENAME, std::ios::binary);
+    if (!ifs) {
+        m_FileIsEmpty = true;
+        return;
+    }
+
+    // ¼ÆËã¼ÇÂ¼Êý
+    ifs.seekg(0, std::ios::end);
+    std::streampos fileSize = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+
+    if (fileSize == 0) {
+        m_FileIsEmpty = true;
+        return;
+    }
+
+    std::vector<Worker*> workers;
+    while (ifs.peek() != EOF) {
+        int id, deptId;
+        size_t nameLength;
+        std::string name;
+
+        ifs.read(reinterpret_cast<char*>(&id), sizeof(int));
+        ifs.read(reinterpret_cast<char*>(&nameLength), sizeof(size_t));
+        name.resize(nameLength);
+        ifs.read(&name[0], nameLength);
+        ifs.read(reinterpret_cast<char*>(&deptId), sizeof(int));
+
+        Worker* worker = nullptr;
+        switch (deptId) {
+        case 1: worker = new Employee(id, name, deptId); break;
+        case 2: worker = new Manager(id, name, deptId); break;
+        case 3: worker = new Boss(id, name, deptId); break;
+        }
+
+        if (worker) workers.push_back(worker);
+    }
+
+    m_EmpNum = workers.size();
+    m_EmpArray = new Worker * [m_EmpNum];
+    for (int i = 0; i < m_EmpNum; i++) {
+        m_EmpArray[i] = workers[i];
+    }
+
+    m_FileIsEmpty = (m_EmpNum == 0);
+    ifs.close();
+}
+
+int WorkerManager::getWorkerIndex(int id) const {
+    for (int i = 0; i < m_EmpNum; i++) {
+        if (m_EmpArray[i]->m_Id == id) {
+            return i;
+        }
+    }
+    return -1;
+}
