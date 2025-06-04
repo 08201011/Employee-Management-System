@@ -189,3 +189,115 @@ void ShowFindDialog(HWND hParent) {
         WS_POPUP | WS_CAPTION | WS_SYSMENU,
         x, y, 350, 200,
         hParent, NULL, NULL, NULL);
+
+
+    // 创建控件
+// 1. ID输入框
+    CreateWindow(L"STATIC", L"输入职工ID:", WS_VISIBLE | WS_CHILD,
+        20, 20, 80, 20, hDlg, NULL, NULL, NULL);
+    HWND hEditId = CreateWindow(L"EDIT", L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | WS_TABSTOP,
+        120, 20, 200, 25, hDlg, (HMENU)1101, NULL, NULL);
+
+    // 2. 查找按钮
+    HWND hBtnFind = CreateWindow(L"BUTTON", L"查找",
+        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_TABSTOP,
+        120, 70, 100, 30, hDlg, (HMENU)IDOK, NULL, NULL);
+
+    // 3. 取消按钮
+    HWND hBtnCancel = CreateWindow(L"BUTTON", L"取消",
+        WS_VISIBLE | WS_CHILD | WS_TABSTOP,
+        120, 120, 100, 30, hDlg, (HMENU)IDCANCEL, NULL, NULL);
+
+    // 显示对话框
+    ShowWindow(hDlg, SW_SHOW);
+    SetFocus(hEditId);
+
+    // 消息循环
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0) && IsWindow(hDlg)) {
+        if (!IsDialogMessage(hDlg, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+}
+
+// 3. 查找对话框过程函数
+LRESULT CALLBACK FindDialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_COMMAND: {
+        switch (LOWORD(wParam)) {
+        case IDOK: {  // 查找按钮
+            // 获取输入的ID
+            wchar_t idText[32] = { 0 };
+            GetDlgItemText(hDlg, 1101, idText, 32);
+
+            if (wcslen(idText) == 0) {
+                MessageBox(hDlg, L"请输入职工ID", L"提示", MB_ICONWARNING);
+                break;
+            }
+
+            int id = _wtoi(idText);
+
+            // 执行查询
+            bool found = false;
+            std::wstring info;
+            auto workers = g_WorkerManager.GetAllWorkers();
+
+            for (auto worker : workers) {
+                if (worker->m_Id == id) {
+                    info = L"职工ID: " + std::to_wstring(worker->m_Id) + L"\n"
+                        L"姓名: " + std::wstring(worker->m_Name.begin(), worker->m_Name.end()) + L"\n"
+                        L"部门: " + worker->getDeptName();
+                    found = true;
+                    break;
+                }
+            }
+
+            // 显示结果
+            MessageBox(hDlg,
+                found ? info.c_str() : L"未找到指定ID的职工",
+                L"查询结果",
+                MB_OK);
+
+            // 不关闭对话框，可以继续查询
+            SetDlgItemText(hDlg, 1101, L"");
+            SetFocus(GetDlgItem(hDlg, 1101));
+            break;
+        }
+        case IDCANCEL:  // 取消按钮
+            DestroyWindow(hDlg);
+            break;
+        }
+        break;
+    }
+    case WM_CLOSE:
+        DestroyWindow(hDlg);
+        break;
+    case WM_DESTROY:
+        RemoveProp(hDlg, L"PARENT_HWND");
+        //PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hDlg, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+
+void ShowAddDialog(HWND hParent) {
+    static bool classRegistered = false;
+    if (!classRegistered) {
+        WNDCLASS wc = { 0 };
+        wc.lpfnWndProc = AddDialogProc;
+        wc.hInstance = GetModuleHandle(NULL);
+        wc.lpszClassName = L"AddDialogClass";
+        wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+        RegisterClass(&wc);
+        classRegistered = true;
+    }
+
+    HWND hDlg = CreateWindow(L"AddDialogClass", L"添加职工",
+        WS_POPUP | WS_CAPTION | WS_SYSMENU, 350, 250, 350, 250,
+        hParent, NULL, NULL, NULL);
