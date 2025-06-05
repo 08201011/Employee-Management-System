@@ -301,3 +301,163 @@ void ShowAddDialog(HWND hParent) {
     HWND hDlg = CreateWindow(L"AddDialogClass", L"添加职工",
         WS_POPUP | WS_CAPTION | WS_SYSMENU, 350, 250, 350, 250,
         hParent, NULL, NULL, NULL);
+
+
+    // 控件创建代码...
+      // ... [保持原有添加对话框控件创建代码不变]
+       // 3. 创建所有控件（与之前相同）
+      // 3. 创建所有控件（带详细文字说明）
+      // 工号输入
+    CreateWindow(L"STATIC", L"职工工号:", WS_VISIBLE | WS_CHILD,
+        20, 20, 80, 20, hDlg, NULL, NULL, NULL);
+    HWND hEditId = CreateWindow(L"EDIT", L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_NUMBER | WS_TABSTOP,
+        120, 20, 200, 25, hDlg, (HMENU)1008, NULL, NULL);
+
+    // 姓名输入
+    CreateWindow(L"STATIC", L"职工姓名:", WS_VISIBLE | WS_CHILD,
+        20, 60, 80, 20, hDlg, NULL, NULL, NULL);
+    HWND hEditName = CreateWindow(L"EDIT", L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | WS_TABSTOP,
+        120, 60, 200, 25, hDlg, (HMENU)1009, NULL, NULL);
+
+    // 职位选择
+    CreateWindow(L"STATIC", L"职位类型:", WS_VISIBLE | WS_CHILD,
+        20, 100, 80, 20, hDlg, NULL, NULL, NULL);
+    HWND hComboDept = CreateWindow(L"COMBOBOX", L"",
+        WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_TABSTOP,
+        120, 100, 200, 150, hDlg, (HMENU)1010, NULL, NULL);
+
+    // 初始化下拉框
+    SendMessage(hComboDept, CB_ADDSTRING, 0, (LPARAM)L"普通员工");
+    SendMessage(hComboDept, CB_ADDSTRING, 0, (LPARAM)L"部门经理");
+    SendMessage(hComboDept, CB_ADDSTRING, 0, (LPARAM)L"公司老板");
+    SendMessage(hComboDept, CB_SETCURSEL, 0, 0);
+
+    // 操作按钮
+    HWND hBtnOk = CreateWindow(L"BUTTON", L"确定",
+        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_TABSTOP,
+        80, 160, 80, 30, hDlg, (HMENU)IDOK, NULL, NULL);
+    HWND hBtnCancel = CreateWindow(L"BUTTON", L"取消",
+        WS_VISIBLE | WS_CHILD | WS_TABSTOP,
+        200, 160, 80, 30, hDlg, (HMENU)IDCANCEL, NULL, NULL);
+
+
+    SetProp(hDlg, L"PARENT_HWND", hParent);
+    ShowWindow(hDlg, SW_SHOW);
+
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0) && IsWindow(hDlg)) {
+        if (!IsDialogMessage(hDlg, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+}
+
+// 修改后的对话框显示函数
+void ShowModifyDialog(HWND hParent, Worker* pWorker) {
+    static bool classRegistered = false;
+    if (!classRegistered) {
+        WNDCLASSW wc = { 0 };
+        wc.lpfnWndProc = ModifyDialogProc;
+        wc.hInstance = GetModuleHandleW(NULL);
+        wc.lpszClassName = L"ModifyDialogClass";
+        wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+        wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+        RegisterClassW(&wc);
+        classRegistered = true;
+    }
+
+    // 计算居中位置
+    RECT rcParent;
+    GetWindowRect(hParent, &rcParent);
+    int x = rcParent.left + (rcParent.right - rcParent.left - 350) / 2;
+    int y = rcParent.top + (rcParent.bottom - rcParent.top - 250) / 2;
+
+    // 修改CreateWindowW调用，添加pWorker参数
+    HWND hDlg = CreateWindowW(
+        L"ModifyDialogClass",
+        L"修改职工信息",
+        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        x, y, 350, 250,
+        hParent,
+        NULL,
+        GetModuleHandleW(NULL),
+        (LPVOID)pWorker  // 关键修改：传递指针参数
+    );
+
+    // 设置窗口数据
+    SetWindowLongPtrW(hDlg, GWLP_USERDATA, (LONG_PTR)pWorker);
+
+     // 消息循环（需要特殊处理）
+    if (hDlg) {
+        ShowWindow(hDlg, SW_SHOW);
+        UpdateWindow(hDlg);
+
+        MSG msg;
+        while (GetMessageW(&msg, NULL, 0, 0)) {
+            if (!IsDialogMessageW(hDlg, &msg)) {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            if (!IsWindow(hDlg)) break;
+        }
+    }
+}
+
+
+LRESULT CALLBACK AddDialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_COMMAND: {
+        switch (LOWORD(wParam)) {
+        case IDOK: {
+            // 获取控件句柄
+            HWND hEditId = GetDlgItem(hDlg, 1008);
+            HWND hEditName = GetDlgItem(hDlg, 1009);
+            HWND hComboDept = GetDlgItem(hDlg, 1010);
+
+            // 获取输入数据
+            wchar_t idText[32] = { 0 }, nameText[128] = { 0 };
+            GetWindowText(hEditId, idText, 32);
+            GetWindowText(hEditName, nameText, 128);
+            int deptId = SendMessage(hComboDept, CB_GETCURSEL, 0, 0) + 1;
+
+            // 输入验证
+            if (wcslen(idText) == 0 || wcslen(nameText) == 0) {
+                MessageBox(hDlg, L"请填写完整信息！", L"提示", MB_ICONWARNING);
+                break;
+            }
+
+            // 添加到管理系统
+            std::wstring wname(nameText);
+            g_WorkerManager.AddEmp(_wtoi(idText), std::string(wname.begin(), wname.end()), deptId);
+
+            // 刷新主窗口列表
+            HWND hParent = (HWND)GetProp(hDlg, L"PARENT_HWND");
+            if (hParent) {
+                RefreshListView(GetDlgItem(hParent, IDC_LISTVIEW));
+            }
+
+            DestroyWindow(hDlg);
+            return TRUE;
+        }
+        case IDCANCEL: {
+            DestroyWindow(hDlg);
+            return TRUE;
+        }
+        }
+        break;
+    }
+    case WM_CLOSE: {
+        DestroyWindow(hDlg);
+        return TRUE;
+    }
+    case WM_DESTROY: {
+        RemoveProp(hDlg, L"PARENT_HWND");
+        return TRUE;
+    }
+    }
+    return DefWindowProc(hDlg, msg, wParam, lParam);
+
+}
