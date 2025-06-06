@@ -461,3 +461,131 @@ LRESULT CALLBACK AddDialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam
     return DefWindowProc(hDlg, msg, wParam, lParam);
 
 }
+
+LRESULT CALLBACK ModifyDialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    static Worker* pWorker = nullptr;
+
+    switch (msg) {
+    case WM_CREATE: {
+        // 正确获取创建参数
+        CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+        pWorker = reinterpret_cast<Worker*>(pCreate->lpCreateParams);
+
+        if (!pWorker) {
+            MessageBoxW(hDlg, L"数据加载失败：无效指针", L"错误", MB_ICONERROR);
+            return -1;  // 返回-1将阻止窗口创建
+        }
+
+        // 将指针保存到窗口数据
+        SetWindowLongPtrW(hDlg, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWorker));
+
+        // 创建控件
+        CreateWindowW(L"STATIC", L"职工ID:",
+            WS_VISIBLE | WS_CHILD | SS_LEFT,
+            20, 20, 80, 20, hDlg, NULL, NULL, NULL);
+
+        // ID编辑框（只读）
+        CreateWindowW(L"EDIT", std::to_wstring(pWorker->m_Id).c_str(),
+            WS_VISIBLE | WS_CHILD | ES_READONLY | WS_BORDER,
+            120, 20, 200, 25, hDlg, (HMENU)IDC_ID_EDIT, NULL, NULL);
+
+        // 姓名编辑框
+        CreateWindowW(L"STATIC", L"姓名:",
+            WS_VISIBLE | WS_CHILD | SS_LEFT,
+            20, 60, 80, 20, hDlg, NULL, NULL, NULL);
+
+        std::wstring name(pWorker->m_Name.begin(), pWorker->m_Name.end());
+        CreateWindowW(L"EDIT", name.c_str(),
+            WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP,
+            120, 60, 200, 25, hDlg, (HMENU)IDC_NAME_EDIT, NULL, NULL);
+
+        // 部门下拉框
+        CreateWindowW(L"STATIC", L"部门:",
+            WS_VISIBLE | WS_CHILD | SS_LEFT,
+            20, 100, 80, 20, hDlg, NULL, NULL, NULL);
+
+        HWND hCombo = CreateWindowW(L"COMBOBOX", L"",
+            WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP,
+            120, 100, 200, 150, hDlg, (HMENU)IDC_DEPT_COMBO, NULL, NULL);
+
+        // 填充下拉选项
+        const wchar_t* depts[] = { L"普通员工", L"部门经理", L"公司老板" };
+        for (int i = 0; i < 3; ++i) {
+            SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)depts[i]);
+        }
+        SendMessageW(hCombo, CB_SETCURSEL, pWorker->m_DeptId - 1, 0);
+
+        // 操作按钮
+        CreateWindowW(L"BUTTON", L"确定",
+            WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON | WS_TABSTOP,
+            80, 160, 80, 30, hDlg, (HMENU)IDOK, NULL, NULL);
+
+        CreateWindowW(L"BUTTON", L"取消",
+            WS_VISIBLE | WS_CHILD | WS_TABSTOP,
+            200, 160, 80, 30, hDlg, (HMENU)IDCANCEL, NULL, NULL);
+
+        SetFocus(GetDlgItem(hDlg, IDC_NAME_EDIT));
+        return 0;  // 必须返回0表示成功创建
+    }
+    case WM_COMMAND: {
+        pWorker = reinterpret_cast<Worker*>(GetWindowLongPtrW(hDlg, GWLP_USERDATA));
+
+        switch (LOWORD(wParam)) {
+        case IDOK: {
+            if (!pWorker) {
+                MessageBoxW(hDlg, L"数据处理异常", L"错误", MB_ICONERROR);
+                break;
+            }
+
+            // 获取姓名输入
+            wchar_t nameBuf[128] = { 0 };
+            GetDlgItemTextW(hDlg, IDC_NAME_EDIT, nameBuf, _countof(nameBuf));
+            if (wcslen(nameBuf) == 0) {
+                MessageBoxW(hDlg, L"姓名不能为空", L"输入错误", MB_ICONWARNING);
+                break;
+            }
+
+            // 获取部门选择
+            int deptSel = SendDlgItemMessageW(hDlg, IDC_DEPT_COMBO, CB_GETCURSEL, 0, 0);
+            if (deptSel == CB_ERR) {
+                MessageBoxW(hDlg, L"请选择有效部门", L"输入错误", MB_ICONWARNING);
+                break;
+            }
+
+            // 更新数据
+            pWorker->m_Name = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(nameBuf);
+            pWorker->m_DeptId = deptSel + 1;
+
+            // g_WorkerManager.SaveToFile();
+
+             // 刷新主窗口
+
+            HWND hParent = GetParent(hDlg);
+            if (hParent) {
+
+                HWND hList = GetDlgItem(hParent, IDC_LISTVIEW);
+                RefreshListView(hList);
+            }
+
+            DestroyWindow(hDlg);
+            return TRUE;
+        }
+        case IDCANCEL:
+            DestroyWindow(hDlg);
+            return TRUE;
+        }
+        break;
+    }
+    case WM_CLOSE:
+        DestroyWindow(hDlg);
+        return 0;
+    case WM_DESTROY:
+        RemoveProp(hDlg, L"PARENT_HWND");
+        // PostQuitMessage(0);
+        return 0;
+    default:
+        return DefWindowProcW(hDlg, msg, wParam, lParam);
+    }
+    return 0;
+}
+
