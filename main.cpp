@@ -589,3 +589,157 @@ LRESULT CALLBACK ModifyDialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lPa
     return 0;
 }
 
+LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_CREATE: {
+        INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX), ICC_LISTVIEW_CLASSES };
+        InitCommonControlsEx(&icex);
+
+        HWND hList = CreateWindow(WC_LISTVIEW, L"",
+            WS_VISIBLE | WS_CHILD | LVS_REPORT | LVS_SINGLESEL,
+            10, 10, 760, 400, hWnd, (HMENU)IDC_LISTVIEW, NULL, NULL);
+
+        LVCOLUMN lvc = { LVCF_WIDTH | LVCF_TEXT };
+        lvc.cx = 100;
+        lvc.pszText = const_cast<LPWSTR>(L"ID");
+        ListView_InsertColumn(hList, 0, &lvc);
+
+        lvc.cx = 150;
+        lvc.pszText = const_cast<LPWSTR>(L"姓名");
+        ListView_InsertColumn(hList, 1, &lvc);
+
+        lvc.cx = 200;
+        lvc.pszText = const_cast<LPWSTR>(L"职位");
+        ListView_InsertColumn(hList, 2, &lvc);
+
+        int y = 420;
+        const struct {
+            int id; LPCWSTR text;
+        } buttons[] = {
+            {IDC_ADD_BUTTON, L"添加职工"},
+            {IDC_DELETE_BUTTON, L"删除职工"},
+            {IDC_MODIFY_BUTTON, L"修改职工"},
+            {IDC_FIND_BUTTON, L"查找职工"},
+            {IDC_SORT_BUTTON, L"排序"},
+            {IDC_CLEAR_BUTTON, L"清空数据"}
+        };
+
+        for (int i = 0; i < 6; ++i) {
+            CreateWindow(L"BUTTON", buttons[i].text, WS_VISIBLE | WS_CHILD,
+                20 + i * 120, y, 100, 30, hWnd, (HMENU)buttons[i].id, NULL, NULL);
+        }
+
+        RefreshListView(hList);
+        break;
+    }
+
+    case WM_COMMAND: {
+        HWND hList = GetDlgItem(hWnd, IDC_LISTVIEW);
+
+        switch (LOWORD(wParam)) {
+        case IDC_ADD_BUTTON:
+            ShowAddDialog(hWnd);
+            break;
+
+        case IDC_MODIFY_BUTTON: {
+            int selected = ListView_GetNextItem(hList, -1, LVNI_SELECTED);
+            if (selected == -1) {
+                MessageBox(hWnd, L"请先选择职工", L"提示", MB_ICONINFORMATION);
+                break;
+            }
+
+            LVITEM item = { 0 };
+            item.mask = LVIF_PARAM;
+            item.iItem = selected;
+            if (!ListView_GetItem(hList, &item)) {
+                MessageBox(hWnd, L"获取选中项失败", L"错误", MB_ICONERROR);
+                break;
+            }
+
+            Worker* pWorker = reinterpret_cast<Worker*>(item.lParam);
+            if (!pWorker) {
+                MessageBox(hWnd, L"无效的职工数据", L"错误", MB_ICONERROR);
+                break;
+            }
+
+            ShowModifyDialog(hWnd, pWorker); // 确保传递有效指针
+            RefreshListView(hList);
+            break;
+        }
+
+        case IDC_DELETE_BUTTON: {
+            int sel = ListView_GetNextItem(hList, -1, LVNI_SELECTED);
+            if (sel == -1) {
+                MessageBox(hWnd, L"请先选择要删除的职工", L"提示", MB_ICONINFORMATION);
+                break;
+            }
+
+            LVITEM item = { LVIF_PARAM };
+            item.iItem = sel;
+            ListView_GetItem(hList, &item);
+            Worker* pWorker = reinterpret_cast<Worker*>(item.lParam);
+
+            if (pWorker) {
+                g_WorkerManager.DeleteEmp(pWorker->m_Id);
+                RefreshListView(hList);
+            }
+            break;
+        }
+
+
+                              // 4. 在主窗口的IDC_FIND_BUTTON处理中调用
+        case IDC_FIND_BUTTON:
+            ShowFindDialog(hWnd);
+            break;
+
+
+        case IDC_CLEAR_BUTTON:
+            if (MessageBox(hWnd, L"确定要清空所有数据吗？", L"警告",
+                MB_YESNO | MB_ICONWARNING) == IDYES) {
+                g_WorkerManager.CleanFile();
+                RefreshListView(hList);
+            }
+            break;
+        }
+        break;
+    }
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    default:
+        return DefWindowProc(hWnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+// 修改后的WinMain函数
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    LPSTR lpCmdLine, int nCmdShow)
+{
+    // 1. 注册主窗口类
+    WNDCLASS wc = { 0 };
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"StaffManagement";
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    RegisterClass(&wc);
+
+    // 2. 创建主窗口(但不立即显示)
+    HWND hWnd = CreateWindow(L"StaffManagement", L"教职工管理系统",
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+        800, 600, NULL, NULL, hInstance, NULL);
+
+    // 3. 创建并显示登录对话框
+    CreateLoginDialog(hWnd);
+
+    // 4. 消息循环
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return (int)msg.wParam;
+}
