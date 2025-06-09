@@ -688,9 +688,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 
                               // 4. 在主窗口的IDC_FIND_BUTTON处理中调用
-        case IDC_FIND_BUTTON:
-            ShowFindDialog(hWnd);
+        case IDC_FIND_BUTTON: {
+            wchar_t idText[32];
+            if (GetDlgItemText(hWnd, IDC_ID_EDIT, idText, 32) == 0) {
+                MessageBox(hWnd, L"请输入要查找的职工ID", L"提示", MB_ICONINFORMATION);
+                break;
+            }
+
+            g_WorkerManager.FindEmp(_wtoi(idText));
             break;
+        }
+
+        case IDC_SORT_BUTTON: {
+            g_WorkerManager.SortById();
+            RefreshListView(hList);
+            break;
+        }
+
 
 
         case IDC_CLEAR_BUTTON:
