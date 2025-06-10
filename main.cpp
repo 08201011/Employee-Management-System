@@ -612,6 +612,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         lvc.pszText = const_cast<LPWSTR>(L"职位");
         ListView_InsertColumn(hList, 2, &lvc);
 
+        // 添加职责列
+        lvc.cx = 300;
+        lvc.pszText = const_cast<LPWSTR>(L"职责");
+        ListView_InsertColumn(hList, 3, &lvc);
+
         int y = 420;
         const struct {
             int id; LPCWSTR text;
