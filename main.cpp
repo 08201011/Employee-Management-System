@@ -689,6 +689,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                               // 4. 在主窗口的IDC_FIND_BUTTON处理中调用
         case IDC_FIND_BUTTON: {
+            ShowFindDialog(hWnd);
             wchar_t idText[32];
             if (GetDlgItemText(hWnd, IDC_ID_EDIT, idText, 32) == 0) {
                 MessageBox(hWnd, L"请输入要查找的职工ID", L"提示", MB_ICONINFORMATION);
